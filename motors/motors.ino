@@ -28,8 +28,8 @@
 
 MPU6050 mpu(Wire1);
 
-PioEncoder encoder1(ENCODER_PIN_1);
-PioEncoder encoder2(ENCODER_PIN_2);
+//PioEncoder encoder1(ENCODER_PIN_1);
+//PioEncoder encoder2(ENCODER_PIN_2);
 
 float yawOffset = 0;
 float finalYaw = 0;
@@ -40,6 +40,27 @@ bool toggleButton = false;
 unsigned long buttonTimer = 0;
 unsigned long loopTimer = 0;
 unsigned long commandTimer = 0;
+unsigned long velocityTimer1 = 0;
+unsigned long velocityTimer2 = 0;
+
+double currentVelocity1 = 0.0;
+double currentVelocity2 = 0.0;
+double prevVelocity1 = 0.0;
+double prevVelocity2 = 0.0;
+
+int encoderCount1 = 0;
+int encoderCount2 = 0;
+int prevEncoderCount1 = 0;
+int prevEncoderCount2 = 0;
+
+bool prevChanA1 = false;
+bool prevChanB1 = false;
+bool prevChanA2 = false;
+bool prevChanB2 = false;
+bool chanA1 = false;
+bool chanB1 = false;
+bool chanA2 = false;
+bool chanB2 = false;
 
 enum Commands {
   FORWARD,
@@ -77,8 +98,17 @@ enum Invert {
   NOT_INVERTED
 };
 
+enum EncoderFlip {
+  NOT_FLIPPED,
+  FLIPPED
+};
+
 Invert inverts[2] = {
   NOT_INVERTED, NOT_INVERTED
+};
+
+EncoderFlip encoderFlips[2] = {
+  NOT_FLIPPED, FLIPPED
 };
 
 RP2040_PWM* motors[2] {
@@ -111,12 +141,25 @@ void setup() {
 
   pinMode(ANALOGBUTTON, INPUT);
 
+  pinMode(ENCODER_PIN_1, INPUT);
+  pinMode(ENCODER_PIN_2, INPUT);
+  pinMode((ENCODER_PIN_1)+1, INPUT);
+  pinMode((ENCODER_PIN_2)+1, INPUT);
+  
+
   Serial.begin(9600);
   Serial.println("Finished with motor setup!");
 
 }
 
 void loop() {
+
+  updateEncoderCounts();
+
+  Serial.print(currentVelocity1);
+  Serial.print(",");
+  Serial.println(currentVelocity2);
+
   mpu.update();
 
   if (analogRead(ANALOGBUTTON) == 1023 && (millis()-buttonTimer)>BUTTON_DEBOUNCE_TIME) {
@@ -127,13 +170,82 @@ void loop() {
   if (toggleButton && (millis()-loopTimer)>LOOPTIME_DT) { // If the button was pressed
     Serial.println("Executing program from button!");
 
-    turnRight();
-    programState = STOP_PROGRAM;
+    //setMotorSignedPWM(ONE, 1.0f);
 
     if (programState == STOP_PROGRAM) {
       toggleButton = false;
     }
     loopTimer = millis();
+  }
+
+  prevEncoderCount1 = encoderCount1;
+  prevEncoderCount2 = encoderCount2;
+  prevVelocity1 = currentVelocity1;
+  prevVelocity2 = currentVelocity2;
+
+}
+
+void updateEncoderCounts(){
+  chanA1 = digitalRead(ENCODER_PIN_1);
+  chanB1 = digitalRead((ENCODER_PIN_1)+1);
+  chanA2 = digitalRead(ENCODER_PIN_2);
+  chanB2 = digitalRead((ENCODER_PIN_2)+1);
+
+  // Check for state changes and update counter based on direction
+  if (prevChanA1 != chanA1) {
+    if (chanA1 != chanB1) {
+      int change = 1;
+      if (encoderFlips[0] == FLIPPED) {
+        change *= -1;
+      }
+      
+      // A changed before B, increment counter
+      encoderCount1 += change;
+    } else {
+      int change = 1;
+      if (encoderFlips[0] == FLIPPED) {
+        change *= -1;
+      }
+
+      // A changed after B, decrement counter
+      encoderCount1 -= change;
+    }
+  }
+
+    // Check for state changes and update counter based on direction
+  if (prevChanA2 != chanA2) {
+    if (chanA2 != chanB2) {
+      int change = 1;
+      if (encoderFlips[1] == FLIPPED) {
+        change *= -1;
+      }
+
+      // A changed before B, increment counter
+      encoderCount2 += change;
+    } else {
+      int change = 1;
+      if (encoderFlips[1] == FLIPPED) {
+        change *= -1;
+      }
+
+      // A changed after B, decrement counter
+      encoderCount2 -= change;
+    }
+  }
+
+  prevChanA1 = chanA1;
+  prevChanB1 = chanB1;
+  prevChanA2 = chanA2;
+  prevChanB2 = chanB2;
+
+  if (encoderCount1 != prevEncoderCount1) {
+    currentVelocity1 = ((encoderCount1 - prevEncoderCount1)/((micros()-velocityTimer1)/1000000.0));
+    velocityTimer1 = micros();
+  }
+
+  if (encoderCount2 != prevEncoderCount2) {
+    currentVelocity2 = ((encoderCount2 - prevEncoderCount2)/((micros()-velocityTimer2)/1000000.0));
+    velocityTimer2 = micros();
   }
 }
 
