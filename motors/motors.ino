@@ -17,14 +17,17 @@
 #define FREQUENCY 300000
 #define ANALOGBUTTON 26
 #define LOOPTIME_DT 10 // 10 milliseconds looptime
-#define MAX_ANGLE_DEV 0.1
+#define MAX_ANGLE_DEV 1.0 // Degrees
+#define MAX_DIST_DEV 10.0 // Ticks
 
 #define SDA 6
 #define SCL 7
 
 #define BUTTON_DEBOUNCE_TIME 250
 
-#define TURNKP 0.005
+#define TURNKP 0.010
+
+#define DISTANCEKP 0.2
 
 MPU6050 mpu(Wire1);
 
@@ -155,10 +158,9 @@ void setup() {
 void loop() {
 
   updateEncoderCounts();
-
-  Serial.print(currentVelocity1);
+  Serial.print(encoderCount1);
   Serial.print(",");
-  Serial.println(currentVelocity2);
+  Serial.println(encoderCount2);
 
   mpu.update();
 
@@ -171,7 +173,10 @@ void loop() {
     Serial.println("Executing program from button!");
 
     //setMotorSignedPWM(ONE, 1.0f);
-
+    //turnRight();
+    goStraight(1.0, 1000.0);
+    
+   toggleButton = false;
     if (programState == STOP_PROGRAM) {
       toggleButton = false;
     }
@@ -251,6 +256,34 @@ void updateEncoderCounts(){
 
 void calculateYawOffset() {
   finalYaw = mpu.getAngleZ()-yawOffset;
+}
+
+void goStraight(int direction, double distance) {
+  setMotorSignedPWM(ONE, 0.0);
+  setMotorSignedPWM(TWO, 0.0);
+
+  yawOffset = mpu.getAngleZ();
+  calculateYawOffset();
+  
+  commandTimer = millis();
+
+  while (true) {
+
+   if ((millis()-commandTimer)>distance) {
+      commandTimer = millis();
+      break;
+    }
+
+    mpu.update();
+    calculateYawOffset();
+
+    setMotorSignedPWM(ONE, 0.35 + finalYaw*0.005);
+    setMotorSignedPWM(TWO, 0.40 + finalYaw*-0.005);
+
+  }
+
+  setMotorSignedPWM(ONE, 0.0);
+  setMotorSignedPWM(TWO, 0.0);
 }
 
 void turnRight() {
