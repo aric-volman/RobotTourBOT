@@ -178,8 +178,13 @@ void loop() {
     
     //mpu.calcOffsets();
     //turnRight();
-    goStraight(1.0, 1562.5);
+
+    goStraight(1.0, 1562.5*4.0);
     turnRight();
+    goStraight(1.0, 1562.5*2.0);
+    turnRight();
+    goStraight(1.0, 1562.5*3.0);
+
     
    toggleButton = false;
     if (programState == STOP_PROGRAM) {
@@ -264,7 +269,7 @@ void calculateYawOffset() {
 }
 
 void goStraight(int direction, double distance) {
-  mpu.calcGyroOffsets();
+  //mpu.calcGyroOffsets();
   setMotorSignedPWM(ONE, 0.0);
   setMotorSignedPWM(TWO, 0.0);
 
@@ -292,7 +297,7 @@ void goStraight(int direction, double distance) {
 }
 
 void turnRight() {
-  mpu.calcOffsets();
+ // mpu.calcOffsets();
   setMotorSignedPWM(ONE, 0.0);
   setMotorSignedPWM(TWO, 0.0);
 
@@ -335,7 +340,7 @@ void turnRight() {
 }
 
 void turnLeft() {
-  mpu.calcOffsets();
+ // mpu.calcOffsets();
   setMotorSignedPWM(ONE, 0.0);
   setMotorSignedPWM(TWO, 0.0);
 
