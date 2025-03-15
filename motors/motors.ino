@@ -17,15 +17,17 @@
 #define FREQUENCY 300000
 #define ANALOGBUTTON 26
 #define LOOPTIME_DT 10 // 10 milliseconds looptime
-#define MAX_ANGLE_DEV 1.0 // Degrees
+#define MAX_ANGLE_DEV 0.1 // Degrees
 #define MAX_DIST_DEV 10.0 // Ticks
+#define TURNTIMEOUT 500
 
 #define SDA 6
 #define SCL 7
 
-#define BUTTON_DEBOUNCE_TIME 250
+#define BUTTON_DEBOUNCE_TIME 100
 
-#define TURNKP 0.010
+#define TURNKP 0.009
+// 0.008
 
 #define DISTANCEKP 0.2
 
@@ -158,10 +160,9 @@ void setup() {
 void loop() {
 
   updateEncoderCounts();
-  Serial.print(encoderCount1);
-  Serial.print(",");
-  Serial.println(encoderCount2);
-
+  
+  //Serial.println(finalYaw);
+  calculateYawOffset();
   mpu.update();
 
   if (analogRead(ANALOGBUTTON) == 1023 && (millis()-buttonTimer)>BUTTON_DEBOUNCE_TIME) {
@@ -174,7 +175,11 @@ void loop() {
 
     //setMotorSignedPWM(ONE, 1.0f);
     //turnRight();
-    goStraight(1.0, 1000.0);
+    
+    //mpu.calcOffsets();
+    //turnRight();
+    goStraight(1.0, 1562.5);
+    turnRight();
     
    toggleButton = false;
     if (programState == STOP_PROGRAM) {
@@ -259,6 +264,7 @@ void calculateYawOffset() {
 }
 
 void goStraight(int direction, double distance) {
+  mpu.calcGyroOffsets();
   setMotorSignedPWM(ONE, 0.0);
   setMotorSignedPWM(TWO, 0.0);
 
@@ -267,10 +273,9 @@ void goStraight(int direction, double distance) {
   
   commandTimer = millis();
 
-  while (true) {
+  while ((millis()-commandTimer)<distance) {
 
    if ((millis()-commandTimer)>distance) {
-      commandTimer = millis();
       break;
     }
 
@@ -287,6 +292,7 @@ void goStraight(int direction, double distance) {
 }
 
 void turnRight() {
+  mpu.calcOffsets();
   setMotorSignedPWM(ONE, 0.0);
   setMotorSignedPWM(TWO, 0.0);
 
@@ -296,22 +302,73 @@ void turnRight() {
   yawOffset = mpu.getAngleZ();
   calculateYawOffset();
 
-  while (finalYaw < (90.0 + MAX_ANGLE_DEV)) {
-
-    if ((millis()-commandTimer)>2000) {
-      commandTimer = millis();
-      break;
-    }
-
-    if (finalYaw > 90.0 + MAX_ANGLE_DEV && finalYaw < 90.0 - MAX_ANGLE_DEV) {
-      break;
-    }
+  while (abs(finalYaw) < 90.0) {
 
     mpu.update();
     calculateYawOffset();
+
+    if ((millis()-commandTimer)>TURNTIMEOUT) {
+      commandTimer = millis();
+      
 	  Serial.println(finalYaw);
-    setMotorSignedPWM(ONE, -TURNKP*(90.0-finalYaw));
-    setMotorSignedPWM(TWO, TURNKP*(90.0-finalYaw));
+      break;
+    }
+
+    if (abs(finalYaw) < 85.0 + MAX_ANGLE_DEV && abs(finalYaw) > 85.0 - MAX_ANGLE_DEV) {
+      
+	  Serial.println(finalYaw);
+    Serial.println("Got to 85!");
+      break;
+    }
+
+   // setMotorSignedPWM(ONE, -TURNKP*(-90.0-finalYaw));
+    setMotorSignedPWM(TWO, TURNKP*(90.0-finalYaw));/*
+    
+    setMotorSignedPWM(ONE, 0.35);
+    setMotorSignedPWM(TWO, -0.40);*/
+
+  }
+
+  setMotorSignedPWM(ONE, 0.0);
+  setMotorSignedPWM(TWO, 0.0);
+
+}
+
+void turnLeft() {
+  mpu.calcOffsets();
+  setMotorSignedPWM(ONE, 0.0);
+  setMotorSignedPWM(TWO, 0.0);
+
+  commandTimer = millis();
+  double angle = 0.0;
+
+  yawOffset = mpu.getAngleZ();
+  calculateYawOffset();
+
+  while (abs(finalYaw) < 90.0) {
+
+    mpu.update();
+    calculateYawOffset();
+
+    if ((millis()-commandTimer)>TURNTIMEOUT) {
+      commandTimer = millis();
+      
+	  Serial.println(finalYaw);
+      break;
+    }
+
+    if (abs(finalYaw) < 85.0 + MAX_ANGLE_DEV && abs(finalYaw) > 85.0 - MAX_ANGLE_DEV) {
+      
+	  Serial.println(finalYaw);
+    Serial.println("Got to 85!");
+      break;
+    }
+
+   // setMotorSignedPWM(ONE, -TURNKP*(-90.0-finalYaw));
+    setMotorSignedPWM(TWO, TURNKP*(-90.0-finalYaw));/*
+    
+    setMotorSignedPWM(ONE, 0.35);
+    setMotorSignedPWM(TWO, -0.40);*/
 
   }
 
